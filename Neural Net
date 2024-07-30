@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math as m
 
-def init_params(layer_dims):    #number of dimensions in each layer
+def init_params(layer_dims):    #list of number of dimensions in each layer
     np.random.seed(3)
     params = {}
     for l in range(1, len(layer_dims)):
