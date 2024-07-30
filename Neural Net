@@ -2,152 +2,128 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math as m
 
-def init_params(layer_dims):    #list of number of dimensions in each layer
+def init_params(layer_dims):    #list of # of dimensions in each layer
     np.random.seed(3)
     params = {}
-    for l in range(1, len(layer_dims)):
-        params['W'+str(l)] = np.random.randn(layer_dims[l], layer_dims[l-1])*0.01      #height = layer2 , #width = layer1
-        params['b'+str(l)] = np.zeros((layer_dims[l], 1))     #weight vector
-    return param
+    for l in range(1, layer_dims):    #0 = input layer
+        params["W"+str(l)] = numpy.random.random((layer_dims[l], layer_dims[l-1]))
+        params["B"+str(l)] = numpy.random.random((layer_dims[l], 1))
+    return params
 
 def sigmoid(Z):
-    A = 1/(1+np.exp(np.dot(-1, Z)))
-    cache = (Z)
-    
-    return A, cache
+    return 1 / (1 + math.exp(-Z))
 
-def forward_prop(X, params):
-    
-    A = X    # all training examples in batch (input into layer 1). Matrix. Each layer will compute activations for all m training examples simultaneously
-    caches = []
-    L = len(params)//2
-    for l in range(1, L+1):
-        A_prev = A
-        
-        # Linear Hypothesis
-        Z = np.dot(params['W'+str(l)], A_prev) + params['b'+str(l)] 
-        
-        # Storing the linear cache
-        linear_cache = (A_prev, params['W'+str(l)], params['b'+str(l)]) 
-        
-        # Applying sigmoid on linear hypothesis
-        A, activation_cache = sigmoid(Z) 
-        
-         # storing the both linear and activation cache
-        cache = (linear_cache, activation_cache)
-        caches.append(cache)
-    
-    return A, caches
+def forward_prop(prev_layer, params):
+    storage = []
+    for n in range(len(params) // 2):
+        Z = params["W"+str(n)].dot(inputlayer) + params["B"+str(n)]   # Z = Av + b
+        A = sigmoid(Z)
+        storage.append((prev_layer, params['W'+str(l)], params['b'+str(l)]),Z)
+    return A, storage
 
-def cost_function(A, Y):
-    m = Y.shape[1]     #length of true_labels   1, 0
-    
-    cost = (-1/m)*(np.dot(np.log(A), Y.T) + np.dot(log(1-A), 1-Y.T))      # extent of correctly identified false / true    # how well each prediction alligns with true value
-    
+def cost_function(output, true_labels):
+    m = true_labels.shape[1]        #number of columns in true_labels (number of examples)
+    cost = (-1/m)*(np.dot(np.log(output), Y.T) + np.dot(log(1-output), 1-Y.T))
     return cost
 
-def cost_function(A, Y):
-    m = Y.shape[1]     #length of true_labels   1, 0
-    
-    cost = (-1/m)*(np.dot(np.log(A), Y.T) + np.dot(log(1-A), 1-Y.T))      # extent of correctly identified false / true    # how well each prediction alligns with true value
-    
-    return cost
+def one_layer_backward(dA_prev, storage):
 
-def compute_dA(A, Y):
-    m = Y.shape[1]  # number of examples
-    dA = - (1 / m) * (np.divide(Y, A) - np.divide(1 - Y, 1 - A))
-    return dA
-
-def one_layer_backward(current_cache, dA):
-
-    linear_cache, activation_cache = current_cache
+    weights_biases_and_prev_activations, current_activations = storage
     
-    #dA = gradient of cost with respect to current-layer A
-    # A_prev, W, b, Z
+    Z =  weights_biases_and_prev_activations
+    dZ = dA*sigmoid(Z)*(1-sigmoid(Z))    # Z = Wv + b   dC / dA * dA / dZ   dA / dZ = d(Sigmoid(Z))
     
-    Z = activation_cache     # matrix of Z = params['W' + str(l)], A_prev) + params['b' + str(l)] for each node for each layer for each example
-    dZ = dA*sigmoid(Z)*(1-sigmoid(Z))
-    
-    A_prev, W, b = linear_cache
+    A_prev, W, b = weights_biases_and_prev_activations
     m = A_prev.shape[1]     # number of examples
+    dW = (1/m)*np.dot(dZ, A_prev.T)      #avg dW...      dC / dZ * dZ / dW = dZ * A_prev.T
+    db = (1/m)*np.sum(dZ, axis=1, keepdims=True)   # dC / db = dC / dZ * dZ / db = dZ
+    dA_prev = np.dot(W.T, dZ)     # dC / dA_prev = dC / dZ * dZ / dA_prev
     
-    dW = (1/m)*np.dot(dZ, A_prev.T)
-    # W = weight matrix, A_prev = activ matrix, b = bias vector
-    # C wr W = C wr Z x Z wr W
-    # Z = W x A + B therefore Z wr W = A_prev
-    # C wr W = dZ x A_prevT (transposed/flip over diag/ ) / m (to get avg)
-    # dZ has shape (neurons in current layer, examples). A has shape (neurons in prev layer, examples)
-    # shape of W is (n, n_prev) i.e. matrix of dW for each weight. Row = all weights
-    
-    db = (1/m)*np.sum(dZ, axis=1, keepdims=True)
-    #gradient C wr B = C wr Z x Z wr b = dZ x 1 (since Z = W x A_prev + b) = dZ
-    # finds average dZ across training examples
-    dA_prev = np.dot(W.T, dZ)
-    # C wr A_prev = C wr Z x Z wr A_prev = dZ x W
-    
+    # Since we are multiplying Z by W, we transpose W. W is meant to be multiplied by the dimensions of A_prev and output of dimensions of Z. We flip that so it multiplies Z.
+
     return dA_prev, dW, db
 
-
-#For each neuron in the current layer, 
-#the corresponding gradient is computed by summing the products of 
-#dZ values (for all training examples) with the transposed activation values.
-
-# matrix multiply = dot product between each row in dZ and column in AprevT
-
-# if you do math, new matrix basically has sum of a_i_z x z_i_z for all training examples "z"
-# in each element "i" in new matrix. 1st element in new matrix = z_1_1 x a_1_1 +z_1_2 x a_1_2 ..
-# = C wr weight connecting 1st neuron in prev layer to 1st neuron in current later 
-# row = current activation weight is connected to, column = activationw where weight roiginates
-
-# gradient = vector (representing rate of change). The vector has components for each weight 
-# (how much each weight changes wr to the other) to get the velocity vector. Changes in each variable to move in optimal direcction
-# negative gradient = pointing towards minima.
-
-def backprop(A, Y, caches):    # A = final predictions matrix, Y = true labels matrix
-    grads = {}   # gradients for each layer
-    L = len(caches)  # of layers in total (in all examples)
-    m = A.shape[1]   #training examples
-    Y = Y.reshape(AL.shape)
+def backprop(output, true_labels, storage):
     
-    dA = -(np.divide(Y, AL) - np.divide(1-Y, 1-AL))   #matrix of devivatives of of cost matix wr A over m training examples
+    m = true_labels.shape[1
+    dA = - (1 / m) * (np.divide(true_labels, A) - np.divide(1 - true_labels, 1 - A)) 
+    # avg dA value for last layer
     
-    current_cache = caches[L-1]
-    grads['dA'+str(L-1)], grads['dW'+str(L-1)], grads['db'+str(L-1)] = one_layer_backward(dA, current_cache)   
-    #finds gradients for current layer using weights , biases and activations for current layer. How current layer affects cost ! All needed is cache and 
-    #dA for current layer ( # which is found using prev layer) to compute this.
+    grads = {}   # gradient for each layer
+    L = len(storage)  # of layers
+    m = output.shape[1]    # of training examples
+    true_labels = true_labels.reshape(output.shape)  
     
-    for l in reversed(range(L-1)):
+    grads['dA'+str(L-1)], grads['dW'+str(L-1)], grads['db'+str(L-1)] = one_layer_backward(storage[L-1])   
+    
+    #storage[Length_Storage-1]  = last element since storage begins at storage[0]
+                          
+    for l in reversed(range(L)):    #  0 -> L - 1
         
-        current_cache = caches[l]
-        dA_prev_temp, dW_temp, db_temp = one_layer_backward(grads["dA" + str(l+1)], current_cache)
-        grads["dA" + str(l)] = dA_prev_temp
-        grads["dW" + str(l + 1)] = dW_temp
-        grads["db" + str(l + 1)] = db_temp
-        
+        dA_prev, dW, db = one_layer_backward(grads["dA" + str(l+1)], storage[l-1])   #2nd last layer
+        grads["dA" + str(l-1)] = dA_prev    # dA value for 3nd last layer
+        grads["dW" + str(l)] = dW      # dC wr to each weight (matrix) for 2nd last layer
+        grads["db" + str(l)] = db
+    
     return grads
 
-#cache = matrix of weights & bias & activations for each layer for each training example
-
-def update_parameters(parameters, grads, learning_rate):
-    L = len(parameters) // 2
-    
-    for l in range(L):
-        parameters['W'+str(l+1)] = parameters['W'+str(l+1)] - learning_rate*grads['W'+str(l+1)]
-        parameters['b'+str(l+1)] = parameters['b'+str(l+1)] -  learning_rate*grads['b'+str(l+1)]
-        
+def Gradient_Descent(LR, params, grads):
+    for l in range((len(params) // 2)+1):
+        params["W"+str(l)] = params["W"+str(l)] - LR*grads["dW"+str(l)]
+        params["b"+str(l)] = params["b"+str(l)] - LR*grads["db"+str(l)]
     return parameters
 
-def train(X, Y, layer_dims, epochs, lr):
+import numpy as np
+import struct
+
+def MNIST_data_processing():
+    
+    def read_idx(filename):
+        with open(filename, 'rb') as f:
+            zero, data_type, dims = struct.unpack('>HBB', f.read(4))
+            shape = tuple(struct.unpack('>I', f.read(4))[0] for d in range(dims))
+            return np.frombuffer(f.read(), dtype=np.uint8).reshape(shape)
+
+    train_images = read_idx('train-images.idx3-ubyte')
+    train_labels = read_idx('train-labels.idx1-ubyte')
+    test_images = read_idx('t10k-images.idx3-ubyte')
+    test_labels = read_idx('t10k-labels.idx1-ubyte')
+
+    train_images = train_images.astype(np.float32) / 255.0
+    test_images = test_images.astype(np.float32) / 255.0
+
+    train = train_images.reshape(train_images.shape[0], -1)
+    test = test_images.reshape(test_images.shape[0], -1)
+
+    #stoichastic gradient descent
+    split_fraction = 0.2
+    num_samples = train_images.shape[0]
+    indices = np.arange(num_samples)
+    np.random.shuffle(indices)
+    
+    training_sets = {}
+    for n in range(1 // split_fraction):
+        training_sets["T"+str(n)] = train_images[indices[n*split_fraction*len(indices):]]
+        training_labels["L"+str(n)] = train_labels[indices[n*split_fraction*len(indices):]]
+    
+def train(params, epochs, LR, layer_dims, training_sets, true_labels):
+    
     params = init_params(layer_dims)
     cost_history = []
-    
-    for i in range(epochs):
-        Y_hat, caches = forward_prop(X, params)
-        cost = cost_function(Y_hat, Y)
-        cost_history.append(cost)
-        grads = backprop(Y_hat, Y, caches)
         
-        params = update_parameters(params, grads, lr)
+    for l in range(len(training_sets)):
         
-        
+        training_sets[l] = prev_layer
+
+        for i in range(epochs):
+            A, storage = forward_prop(prev_layer, params)
+            cost = cost_function(A, true_labels)
+            cost_history.append(np.sum(cost) // m)
+            grads = backprop(A, true_labels, storage)
+            params = Gradient_Descent(LR, params, grads)
+            print(f"Test {i} done")
+            
+    print(plt.plot(np.array(cost_history), range(cost_history)))
+    print(cost_history[-1])
+
     return params, cost_history
