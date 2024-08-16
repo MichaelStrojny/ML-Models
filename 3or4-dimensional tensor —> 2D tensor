@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# reduces n-dimensional tensor to 2D tensor (batch, x) suitable for NNs while preserving spatial relationships. How to Use:
+# reduces 3or4-dimensional tensor to 2D tensor (batch, x) suitable for NNs while preserving spatial relationships. How to Use:
 # Step 1: create neural network "Model()"
 # Step 2: optimize the following Model((CNN(input))
 
