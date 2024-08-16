@@ -2,7 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-#tensor must have at least 4 dimensions for the CNN, yet this code accepts 3D tensors too. It adds a channel and the CNN extracts structural features between non batch dimensions
+# reduces n-dimensional tensor to 2D tensor (batch, x) suitable for NNs while preserving spatial relationships. How to Use:
+# Step 1: create neural network "Model()"
+# Step 2: optimize the following Model((CNN(input))
 
 class CNN(nn.Module):
     def __init__(self, input_channels, output_classes, filter_size=3, num_filters=32, pool_size=2):
