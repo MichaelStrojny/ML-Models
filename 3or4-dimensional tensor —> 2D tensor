@@ -24,14 +24,14 @@ class CNN(nn.Module):
         if x.dim() < 3:
             raise ValueError("Tensor must have at least 3 dimensions")
         if x.dim() == 3:
-            x = x.unsqueeze(1)     # add channel  
+            x = x.unsqueeze(1) 
         
         x = self.pool(F.relu(self.conv(x)))
 
         if self.fc is None:     #initialized at first input to match dims of flattened convolution output
-            self.flattened_size = x.numel() // x.shape[0]  # total elements in tensor excluding batch size
+            self.flattened_size = x.numel() // x.shape[0]  # total elements in tensor / batch size = # of input nodes in linear layer
             self.fc = nn.Sequential(
-                nn.Linear(self.flattened_size, 128),
+                nn.Linear(self.flattened_size, 128),     # 128 = random value. Can change if you wish
                 nn.ReLU(),
                 nn.Linear(128, self.output_classes),
                 nn.Softmax(dim=1)
