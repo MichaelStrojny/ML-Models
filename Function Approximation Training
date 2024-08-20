@@ -1,0 +1,126 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader, random_split
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+import os
+
+# This is an effective algorthm to train & test NNs approximating mathematical functions
+# Replace the model "FunctionApproximator" with your own
+# Fill the dictionary named "functions" with different mathematical functions & their names. Run the code to train & test the model on all the functions.
+# set s = 0 if you simply want to test the model on your dictionay of functions
+
+class DataSet(Dataset):
+    def __init__(self, data, labels):
+        self.data = data
+        self.labels = labels
+    def __len__(self):
+        return len(self.data)
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+
+# Model
+class FunctionApproximator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(1, 100)
+        self.fc2 = nn.Linear(100, 100)
+        self.fc3 = nn.Linear(100, 1)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+def Loss(model, x, y):
+    return F.mse_loss(model(x), y)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Generate data
+input = torch.rand(100000, 1, device=device)
+functions = {"Function_1": return torch.exp(torch.tanh(torch.sin(torch.log10(torch.log10(x**2 + 1) ** 2) ** 3)))}      ### Functions Dictionary !! ###
+labels = {}
+
+for name, func in functions.items():
+    labels[name] = DataSet(input, func(input))
+    print("data generating")
+print("data generation finished")
+
+# train and test
+
+model = FunctionApproximator().to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+epochs = 20
+train_losses = {}     # list of avg training loss per epoch for every function
+test_losses = {}      #...
+test_acc = {}        # same concept but for accuracy
+
+for name, data in labels.items():
+    s = 0.8     # training sample size in %     0 < s < 1 
+    train_size = int(s * len(data))
+    train_dataset, test_dataset = random_split(data, [train_size, len(data) - train_size])
+    
+# Training
+    model.train()
+    train_losses[name] = []
+    for epoch in range(epochs):
+        loss = 0
+        for x, y in train_loader:
+            x, y = x.to(device), y.to(device)
+            loss = Loss(model, x, y)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            loss += loss.item()    #tensor -> scalar
+        train_losses[name].append(total_loss / len(x))
+
+# Testing
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    model.eval()
+    torch.no_grad()
+    test_losses[name] = []
+    test_acc[name] = []
+    with torch.no_grad():
+        for epoch in range(epochs):
+            loss = 0
+            acc = 0
+            for x, y in test_loader:
+                x, y = x.to(device), y.to(device)
+                loss = Loss(model, x, y)
+                acc = (model(x) - y).abs().mean()
+                loss += loss.item()
+                acc += acc.item()
+            test_losses[name].append(loss / len(x))
+            test_acc[name].append(acc / len(x))
+
+# visualize accuracy & loss per function
+
+plt.figure()
+xaxis = list(range(epochs))
+for name, losses in train_losses.items():
+    plt.plot(xaxis, losses, label=f"train_{name}")
+for name, losses in test_losses.items():
+    plt.plot(xaxis, losses, label=f"test_{name}")
+for name, acc in test_acc.items():
+    plt.plot(xaxis, acc, label=f"test_{name}")
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+print("Extract loss & accuracy vs epoch data for each function by typing test_acc[Function_Name] or test_losses[Function_Name]")
+
+#save model
+
+directory = 
+filename = 
+file_path = os.path.join(directory, filename)
+
+#create directory if not exist
+os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+torch.save(model.state_dict(), file_path)
