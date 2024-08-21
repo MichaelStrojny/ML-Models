@@ -1,0 +1,100 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+
+# physics informed neural network for a pendulum. Solves the differential equation for a 2D pendulum. Input time data and the corresponding angle and angular velocity of the pendulum. 
+# the model will train to predict the angular velocity and angle of the pendulum given the time input. Loss function includes the residuals of the differential equation to make
+# training quicker and also more accurate in the presence of noisy data
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+class DataSet(Dataset):
+    def __init__(self, x, y, z):
+        self.x = x  # time (INPUT)
+        self.y = y  # angle (LABEL)
+        self.z = z  # angular displacement (LABEL)     # Note also that there is a pendulum length variable "L" that is defined in the training section. Unit = meters
+
+    def __len__(self):
+        return len(self.x)
+
+    def __getitem__(self, idx):
+        return self.x[idx], self.y[idx], self.z[idx]
+
+class PINN(nn.Module):
+    def __init__(self):
+        super(PINN, self).__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(1, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
+            nn.Linear(64, 2)  # angle, angveloc
+        )
+
+    def forward(self, x):
+        return self.layers(x)
+
+def loss_fn(model, x, y, z, L):
+    g = 9.81
+    y_pred = model(x)
+    ang = y_pred[:, 0]  
+    angveloc = y_pred[:, 1]
+    angaccel = torch.autograd.grad(angveloc, x, grad_outputs=torch.ones_like(ang), create_graph=True)[0]
+
+    physics_loss = torch.mean(torch.abs(angaccel + (g / L) * torch.sin(ang)))
+    mseloss = nn.MSELoss()
+    return mseloss(y_pred, torch.cat((y, z), dim=1)) + physics_loss
+
+# Sample data
+time = torch.randn(100, 1)
+angle = torch.randn(100, 1)
+angular_velocity = torch.randn(100, 1)
+
+# data process
+dataset = DataSet(time, angle, angular_velocity)
+model = PINN().to(device)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+s = 0.8  # train percentage
+train_size = round(s * len(dataset))
+train, test = torch.utils.data.random_split(dataset, [train_size, len(dataset) - train_size])
+train_loader = DataLoader(train, batch_size=32, shuffle=True)
+test_loader = DataLoader(test, batch_size=32, shuffle=False)
+
+# pendulum length
+L = 10
+
+# train
+model.train()
+epochs = 1000
+for epoch in range(epochs):
+    model.train()
+    epoch_loss = 0
+    for x, y, z in train_loader:
+        x, y, z = x.to(device), y.to(device), z.to(device)
+        optimizer.zero_grad()
+        batch_loss = loss_fn(model, x, y, z, L)
+        batch_loss.backward()
+        optimizer.step()
+        epoch_loss += batch_loss.item()
+    epoch_loss /= len(train_loader)
+    if epoch % 100 == 0:
+        print(f"Epoch {epoch}, Loss: {epoch_loss}")
+
+#test
+model.eval()
+with torch.no_grad():
+  testloss = 0
+  testacc = 0
+  for x, y, z in test_loader:
+      x, y, z = x.to(device), y.to(device), z.to(device)
+      y_pred = model(x)
+      testloss += loss_fn(model, x, y, z, L).item()
+      testacc += (y_pred - y).abs().mean().item()
+
+testloss = testloss / len(test_loader)
+testacc = testacc / len(test_loader)
+
+print(f"Test Loss = {testloss}, Test Accuracy = {testacc}")
+
+
