@@ -1,1 +1,1 @@
-Collection of various small Machine Learning Projects (< 500 lines of code) done to practice my pytorch skills
+Collection of small machine learning projects (< 500 lines of code) done to practice my pytorch skills
