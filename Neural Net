@@ -76,7 +76,7 @@ def Gradient_Descent(LR, params, grads):
 import numpy as np
 import struct
 
-def MNIST_data_processing():
+def MNIST_data_processing():     # MNIST is a ML data set of hand drawn images
     
     def read_idx(filename):
         with open(filename, 'rb') as f:
@@ -89,22 +89,11 @@ def MNIST_data_processing():
     test_images = read_idx('t10k-images.idx3-ubyte')
     test_labels = read_idx('t10k-labels.idx1-ubyte')
 
-    train_images = train_images.astype(np.float32) / 255.0
+    train_images = train_images.astype(np.float32) / 255.0      #normalize
     test_images = test_images.astype(np.float32) / 255.0
 
-    train = train_images.reshape(train_images.shape[0], -1)
+    train = train_images.reshape(train_images.shape[0], -1)     # each image becomes 1D array . rather inneficient approach. CNN would be better.
     test = test_images.reshape(test_images.shape[0], -1)
-
-    #stoichastic gradient descent
-    split_fraction = 0.2
-    num_samples = train_images.shape[0]
-    indices = np.arange(num_samples)
-    np.random.shuffle(indices)
-    
-    training_sets = {}
-    for n in range(1 // split_fraction):
-        training_sets["T"+str(n)] = train_images[indices[n*split_fraction*len(indices):]]
-        training_labels["L"+str(n)] = train_labels[indices[n*split_fraction*len(indices):]]
     
 def train(params, epochs, LR, layer_dims, training_sets, true_labels):
     
