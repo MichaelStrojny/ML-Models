@@ -1,0 +1,19 @@
+import torch
+import torch.nn as nn
+import torch.utils.data as data
+import math
+import matplotlib
+import torch.nn.functional as Func
+
+# model adds noise to an image (ammount of noise added is based on the value in a list of time steps)
+# resblocks extract abstract / high level features from this noisy image. Then, they take a tensor with these feature and construct a tensor of the noise added at every pixel by upscaling)
+# by being able to predict what noise was added to the image, model is able to start with a image of pure noise, and remove noise iterativley until it can generate an image
+
+class AddNoise(nn.module):
+  def __init__(self, time_steps):
+    super().__init__()
+    self.beta = torch.linspace(1e-4, 0.2, (0.2-1e-4)/time_steps).requires_grad_(False)
+    self.beta = torch.cumprod(1- self.beta).requires_grad_(False)
+
+  def forward(self, x):
+    
