@@ -191,11 +191,27 @@ def Train(num_time_steps, visualize=True):
 
   return model.state_dict(), epoch_losses
 
+
+
+
 ##
 
-#Generate 
+##
 
-#generate mean and SD of latent representation
+##
+
+##
+
+
+
+#Generate Images
+
+
+##
+
+##
+
+# VAE generates mean and SD of latent representation
 #i.e so we can sample from this distribution and generate images similar to input image
 #so we can generate images with varied features of same type
 
