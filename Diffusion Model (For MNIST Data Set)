@@ -38,8 +38,8 @@ class ResBlock(nn.Module):
     self.gnorm2 = nn.GroupNorm(group_size, chan * 3)
     self.dropout = nn.Dropout(p=dropout_prob, inplace=True)
 
-  def forward(self, x, embeddings):
-    x += embeddings[:, :x.shape[1], :, :]    #slicing ensures embeddings match num of channels in x. since num channels changes
+  def forward(self, x, embeddings, embed = True, VAE=False):
+    x += embeddings[:, :x.shape[1], :, :]    #slicing ensures embeddings match num of channels in x. since num channels change)
     r = self.conv1(self.relu(self.gnorm1(x)))
     r = self.dropout(r)
     r = self.conv2(self.relu(self.gnorm2(r)))
@@ -190,3 +190,4 @@ def Train(num_time_steps, visualize=True):
     plt.show()
 
   return model.state_dict(), epoch_losses
+
