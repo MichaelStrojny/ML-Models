@@ -7,18 +7,16 @@ import torch.nn.functional as F
 # Step 2: optimize the following Model((CNN(input))
 
 class CNN(nn.Module):
-    def __init__(self, input_channels, output_classes, filter_size=3, num_filters=32, pool_size=2):
+    def __init__(self, input_chan, output_nodes, filter_size=3, num_filters=32, pool_size=2):
         super(CNN, self).__init__()
 
-#apply filters
+        self.fcNN = None    #will be defined later
+        self.num_filters = num_filters
+        self.output_nodes = output_nodes
+
         self.conv = nn.Conv2d(in_channels=input_channels, out_channels=num_filters, kernel_size=filter_size)
         
-#pooling layer
         self.pool = nn.MaxPool2d(kernel_size=pool_size)
-        
-        self.fc = None
-        self.num_filters = num_filters
-        self.output_classes = output_classes
 
     def forward(self, x):     #  Convolution -> ReLU Activation -> Pooling -> flatten --> fc layer
         if x.dim() < 3:
@@ -26,18 +24,18 @@ class CNN(nn.Module):
         if x.dim() == 3:
             x = x.unsqueeze(1) 
         
-        x = self.pool(F.relu(self.conv(x)))
+        x = self.pool(F.relu(self.conv(x)))    # 1 layer before fc
 
-        if self.fc is None:     #initialized at first input to match dims of flattened convolution output
+        if self.fcNN is None:     #initialized at first input to match dims of flattened convolution output
             self.flattened_size = x.numel() // x.shape[0]  # total elements in tensor / batch size = # of input nodes in linear layer
-            self.fc = nn.Sequential(
+            self.fcNN = nn.Sequential(
                 nn.Linear(self.flattened_size, 128),     # 128 = random value. Can change if you wish
                 nn.ReLU(),
-                nn.Linear(128, self.output_classes),
+                nn.Linear(128, self.output_nodes),
                 nn.Softmax(dim=1)
             )
 
-        x = x.view(x.size(0), -1)
+        x = x.view(x.size(0), -1)   #flatten
         
         x = self.fc(x)
         
