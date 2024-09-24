@@ -146,14 +146,15 @@ class Transformer(nn.Module):
     super(Transformer, self).__init__()
     encoder_embeddings = nn.Embedding(src_vocab_size, input_dims)
     decoder_embeddings = nn.Embedding(tgt_vocab_size, input_dims)
-    # For nn.Embedding, calling the instance with token indices retrieves the corresponding rows from the embedding matrix.
+
+    # calling instance with token indices retrieves the corresponding rows from the embedding matrix.
     # encoder embedding  = essentially a matrix where each row represents the embedding of a specific token from the source vocabulary
     # it is optimized to capture the semantics of the input tokens and their relationships within the source sequence
     # decoder embeddings are optimized to generate tokens based on the context provided by the encoder and the previously generated tokens
     # the decoder_embeddings layer is used to convert token IDs from the target vocabulary into dense vectors that the decoder can process
     #When you create an nn.Embedding layer, PyTorch initializes the weights of the embedding matrix with random values. These values are then updated during the training process to learn better representations of the tokens based on the task at hand.
+
     self.encoder = nn.Modulelist([EncoderLayer(input_dims, num_heads, ff_dims) for _ in range(num_layers)])
-    #creates a num_layers quantity of encoderlayers and stores them in a list specially designed for modules (module list
     self.decoder = nn.Modulelist([DecoderLayer(input_dims, num_heads, ff_dims, dropout) for _ in range(num_layers)])
 
     self.pos_encoder = PosEncode(max_seq_length, input_dims)
