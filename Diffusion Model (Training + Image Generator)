@@ -1,7 +1,7 @@
 
-# First Half of Code = Building and Training a Diffusion Model (UNET)
+# First Half of Code = Building and Training a Diffusion Model (UNET) --> Complete
 
-# Second Half of Code = Using this to build an Image Generator
+# Second Half of Code = Coding an Image Generator using this model --> Work in Progress
 
 import torch
 import torch.nn as nn
@@ -12,15 +12,6 @@ import tqdm
 import torch.nn.functional as func
 
 # by being able to predict what noise was added to the image, diffusion model is able to start with a image of pure noise, and remove noise iterativley until it can generate an image
-
-class Noise_Scheduler(nn.Module):
-    def __init__(self, num_time_steps, image_generation = False):
-        super().__init__()
-        beta = torch.linspace(1e-4, 0.2, num_time_steps).requires_grad_(False)        
-        self.alpha = torch.cumprod(1-beta, dim=0).requires_grad_(False)
-
-    def forward(self, x, t):
-        return alpha[t]
 
 class PosEmbeddings(nn.Module):
     def __init__(self, time_steps, channel_dims):
@@ -139,23 +130,24 @@ class DiffusionModel()
  def forward(self, x, t):
         x = self.input_conv(x)
         residuals = []   #store outputs from each encoder layer
-        #iterate over first half of layers in UNET
+        
+        #encoder
+
         for i in range(self.num_layers//2):
             layer = getattr(self, f'Layer{i+1}')
             embeddings = self.embeddings(x, t)
             x, r = layer(x, embeddings)
             residuals.append(r)
-        #decoder
+    
+        #decoder 
+        # NOTE: adding time embeddings in every layer allows the model to maintain a strong connection to the temporal aspect of the data
+
         for i in range(self.num_layers//2, self.num_layers):
             layer = getattr(self, f'Layer{i+1}')
             x = torch.cat((layer(x, embeddings)[0], residuals[self.num_layers-i-1]), dim=1)
             #concat across channels. so we are adding more channels
         return self.output_conv2(self.relu(self.output_conv1(x)))
         #output dims match original input
-
-# adding time embeddings in every layer allows the model to maintain a strong connection to the temporal aspect of the data 
-      
-#################
 
 # Training
 
@@ -172,8 +164,9 @@ train_data = data.DataLoader(data, batch_size=32, shuffle=True, drop_last=True)
 scheduler = Noise_Scheduler(num_time_steps, image_generation = False)
 
 def Train(num_time_steps, visualize=True):
+  beta = torch.linspace(1e-4, 0.2, num_time_steps).requires_grad_(False)        
+  alpha = torch.cumprod(1-beta, dim=0).requires_grad_(False)
   model.train()
-  alpha = scheduler(t)
   epoch_losses = []
   for i in tqdm(range(epochs)):
       total_loss = 0
@@ -204,17 +197,12 @@ def Train(num_time_steps, visualize=True):
 
 
 ########################
-
-# Image Generator
-
-#generate mean and SD of latent representation
-#i.e so we can sample from this distribution and generate images similar (but with varied features) to input image
-# meana and SD lin layers respectfully output the mean and SD of 64 dimensions (64 random values made up my model to represent the latent space) . 
-# We initially set the mean and SD of these dims to random values (then model learns the mean and sd of these dimensions)
+Part 2: Image Generator
+########################
 
 class VAEEncoder(nn.Module):
     def __init__(self, input_size, input_channels=3, output_dim=64):
-        super(VAEEncoder, self).__init__()
+        super(self).__init__()
 
         self.output_dim = output_dim
         self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=4, stride=2, padding=1)
@@ -243,4 +231,15 @@ class VAEEncoder(nn.Module):
         SD = self.SD(x)
         return Mean, SD
 
+        # NOTES TO SELF:
+        #VAE generates mean and SD of latent representation of ONE specific data set
+        #i.e so we can sample from this distribution and generate images similar to it
+        # mean and SD lin layers respectfully output the mean and SD of 64 dimensions (64 random values made up my model to represent the latent space) 
+        # We initially set the mean and SD of these dims to random values (then model learns the mean and sd of these dimensions)
 
+
+class VAEDecoder(nn.Module):
+    def __init__(self, input_size, input_channels=3, output_dim=64):
+        super(self).__init__()
+
+    
