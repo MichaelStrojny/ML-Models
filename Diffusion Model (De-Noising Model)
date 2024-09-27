@@ -1,6 +1,6 @@
 
-# This model is given the magnitude of noise added to an image (represented by t) and it tries to predict the noise added to the image
-# noise scheduler (t) defines the magnitude of noise added
+# This model is given the magnitude of noise added to an image (represented by t) and it tries to predict the specific noise added to the image
+# magnitude of noise is known (t) but specific realization of that noise is unknown
 
 import torch
 import torch.nn as nn
