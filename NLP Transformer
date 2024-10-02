@@ -8,15 +8,15 @@ import matplotlib.pyplot as plt
 import os
 
 class TransformerTrainingData(data.Dataset):
-  def __init__(self, src, tgt):
-    self.src = src
+  def __init__(self, enc, tgt):
+    self.enc = enc
     self.tgt = tgt
 
   def __len__(self):
-    return len(self.src)
+    return len(self.enc)
 
   def __getitem__(self, idx):
-    return self.src[idx], self.tgt[idx]
+    return self.enc[idx], self.tgt[idx]
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, input_dims, num_heads):
@@ -39,22 +39,22 @@ class MultiHeadAttention(nn.Module):
       return x.transpose(1, 2).contiguous().view(batch_size, seq_length, self.input_dims)
       # after a transpose, the tensor's data is no longer contiguous
 
-    def scaled_dot_product_attention(self, Q, K, V, src_mask=None, tgt_mask=None):
+    def scaled_dot_product_attention(self, Q, K, V, enc_mask=None, tgt_mask=None):
       attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)  #batch, heads, seqlen, seqlen (last two dims = query, key)
-      if src_mask is not None:
-        attn_scores = attn_scores.masked_fill(src_mask == 0, -1e9) #replace elements where src mask == 0 with -1e9
+      if enc_mask is not None:
+        attn_scores = attn_scores.masked_fill(enc_mask == 0, -1e9) #replace elements where enc mask == 0 with -1e9
       if tgt_mask is not None:
-        attn_scores = attn_scores.masked_fill(src_mask == 0, -1e9)
+        attn_scores = attn_scores.masked_fill(enc_mask == 0, -1e9)
       attn_probs = torch.softmax(attn_scores, dim=-1)    # softmax applied to the key dimension for each query token. ensuring that for each query token, the probabilities assigned to all key tokens sum to 1 (not the same other way around). dim = n. every point (x, y, z..) across channel (dimension n) sums up to 1. only across this direction
       # This normalization process ensures that the attention weights reflect a valid probability distribution for how much focus each query token should give to each key token
       output = torch.matmul(attn_probs, V)
       return output
 
-    def forward(self, Q, K, V, src_mask=None, tgt_mask=None):
+    def forward(self, Q, K, V, enc_mask=None, tgt_mask=None):
       Q = self.split_heads(self.query_matrix(Q))
       K = self.split_heads(self.key_matrix(K))
       V = self.split_heads(self.value_matrix(V))
-      output = self.out_proj(self.combine_heads(self.scaled_dot_product_attention(Q, K, V, src_mask, tgt_mask)))
+      output = self.out_proj(self.combine_heads(self.scaled_dot_product_attention(Q, K, V, enc_mask, tgt_mask)))
       return output
 
       #take in sequence and output a sequence with better representation of each token
@@ -129,22 +129,22 @@ class DecoderLayer(nn.Module):
     self.norm3 = nn.LayerNorm(input_dims)
     self.dropout = nn.Dropout(dropout_rate)
     #initialized every class
-    def forward(self, x, enc_output, src_mask, tgt_mask):
+    def forward(self, x, enc_output, enc_mask, tgt_mask):
       attn_output = self.self_attention(x, x, x, tgt_mask=tgt_mask)
       x = self.norm1(x + self.dropout(attn_output))
-      attn_output = self.cross_attention(enc_output, enc_output, x, src_mask, tgt_mask) #ensure padding tokens in src and tgt & future tokens in tgt arent attended to
+      attn_output = self.cross_attention(enc_output, enc_output, x, enc_mask, tgt_mask) #ensure padding tokens in enc and tgt & future tokens in tgt arent attended to
       x = self.norm2(x + self.dropout(attn_output))
       ffn_output = self.ffn(x)
       x = self.norm3(x + self.dropout(ffn_output))
       return
 
-      #purpose of src mask. : If the source sequences have different lengths, padding is often added to make them uniform in length. During the cross-attention phase, we don't want the model to attend to these padding tokens, as they don't carry meaningful information. scr mask turns these tokens into value that is ignored
+      #purpose of enc mask. : If the source sequences have different lengths, padding is often added to make them uniform in length. During the cross-attention phase, we don't want the model to attend to these padding tokens, as they don't carry meaningful information. scr mask turns these tokens into value that is ignored
       # Cross-attention allows the decoder to focus on specific parts of the encoder's output while generating the target sequence. It helps the decoder use information from the source sequence to make more informed predictions.
 
 class Transformer(nn.Module):
-  def __init__(self, src_vocab_size, tgt_vocab_size, input_dims, num_heads, num_layers, max_seq_length, dropout):
+  def __init__(self, enc_vocab_size, tgt_vocab_size, input_dims, num_heads, num_layers, max_seq_length, dropout):
     super(Transformer, self).__init__()
-    encoder_embeddings = nn.Embedding(src_vocab_size, input_dims)
+    encoder_embeddings = nn.Embedding(enc_vocab_size, input_dims)
     decoder_embeddings = nn.Embedding(tgt_vocab_size, input_dims)
 
     # calling instance with token indices retrieves the corresponding rows from the embedding matrix.
@@ -163,9 +163,9 @@ class Transformer(nn.Module):
     self.fc = nn.Linear(input_dims, tgt_vocab_size)
     self.dropout = nn.Dropout(dropout)
 
-    def generate_mask(src, tgt):
+    def generate_mask(enc, tgt):
       # mask type #1 --> padding masks
-      src_mask = (src != 0).unsqueeze(1).unsqueeze(2) #boolean mask. Expected size: [batch_size, 1, 1, sequence_length]
+      enc_mask = (enc != 0).unsqueeze(1).unsqueeze(2) #boolean mask. Expected size: [batch_size, 1, 1, sequence_length]
       tgt_mask = (tgt != 0).unsqueeze(1).unsqueeze(3) # [batch_size, 1, tgt_length, 1]
       # mask type #2 --> ensure model does not attend to future tokens
       seq_length = tgt.size(1)
@@ -176,12 +176,12 @@ class Transformer(nn.Module):
       # same effect as (1, 1, seq_length, seq_length)
       tgt_mask = tgt_mask & nopeak_mask   # & opperation on both tensors. If both corresponding elements are True, then its True. Else, False
       # in other words, must be (1) not padding and (2) not future token to be attended to
-      return src_mask, tgt_mask
+      return enc_mask, tgt_mask
 
-    def forward(self, src, tgt):        #to begin generating, src = "[Start]".  start token
-      # src = input sequence. tgt = sequence to be generated
-      src_mask, tgt_mask = generate_mask(src, tgt)
-      src_embedded = self.dropout(self.positional_encoding(self.encoder_embedding(src)))
+    def forward(self, enc, tgt):        #to begin generating, enc = "[Start]".  start token
+      # enc = input sequence. tgt = sequence to be generated
+      enc_mask, tgt_mask = generate_mask(enc, tgt)
+      enc_embedded = self.dropout(self.positional_encoding(self.encoder_embedding(enc)))
       tgt_embedded = self.dropout(self.positional_encoding(self.decoder_embedding(tgt)))
       # Dropout helps the embeddings learn more robust and generalized features, rather than memorizing specific training examples.
       # Without dropout, embeddings can become too specialized or memorized based on the training data. overfitting
@@ -190,9 +190,9 @@ class Transformer(nn.Module):
       # For each position in the target sequence, the decoder generates a probability distribution over the vocabulary for the next word only using the words before it (due to mask)
 
       for i in self.encoder:
-        src = i(src, src_mask)
+        enc = i(enc, enc_mask)
       for i in self.decoder:
-        tgt = i(tgt_embedded, src, src_mask, tgt_mask)   #(batch_size, seq_length, input_dims) -> (batch_size, seq_length, vocab_size)
+        tgt = i(tgt_embedded, enc, enc_mask, tgt_mask)   #(batch_size, seq_length, input_dims) -> (batch_size, seq_length, vocab_size)
       return tgt
 
 def Loss_fn(model, tgt, preds):
@@ -203,7 +203,7 @@ def Loss_fn(model, tgt, preds):
 model = Transformer(50000, 50000, 561, 12, 6, 500, 0.01)
 
 # data processing
-data = TransformerTrainingData(src, tgt)    #fill with src and tgt tensors from your own training data
+data = TransformerTrainingData(enc, tgt)    #fill with enc and tgt tensors from your own training data
 train_data, test_data = torch.train_test_split(data, test_size=0.2)
 test_data = torch.utils.data.DataLoader(test_data, batch_size=32, shuffle=True)
 # Each batch is a tuple where the first element is a tensor of source sequences and the second element is a tensor of target sequences.
@@ -216,8 +216,8 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 epoch_losses = []
 for epoch in tqdm(range(epochs)):
   epoch_loss = 0
-  for src, tgt in train_data:
-    preds = model(src, tgt[:, :-1])
+  for enc, tgt in train_data:
+    preds = model(enc, tgt[:, :-1])
     loss = Loss_fn(model, tgt, preds)
     optimizer.zero_grad()
     loss.backward()
@@ -231,8 +231,8 @@ model.eval()
 with torch.inference_mode():
   test_loss = 0
   test_accuracy = 0
-  for src, tgt in test_data:
-      preds = model(src, tgt[:, :-1])
+  for enc, tgt in test_data:
+      preds = model(enc, tgt[:, :-1])
       loss = Loss_fn(model, tgt, preds)
       test_loss += loss.item()
       accuracy += torch.sum((preds - tgt[:, 1:]).abs()).item() // torch.numel(preds).item()        # (batch_size, seq_len, input_dims)
