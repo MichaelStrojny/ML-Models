@@ -1,0 +1,16 @@
+# done as practice for my university Python midterm
+# code is very long as no libraries were used...
+
+def pseudo_random_weights_list(min, max):    #create list of 1000 pseudo random values for neural network weights
+  
+
+class neural_net(input, output):
+  self.input = input
+  self.output = output
+
+  mat = []
+  for o in range(len(output)):     
+    for i in range(len(input)):
+      
+
+  self.matrix 
