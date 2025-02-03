@@ -1,16 +1,62 @@
-# done as practice for my university Python midterm
-# code is very long as no libraries were used...
+import torch
+import torch.nn as nn
+import numpy as np
 
-def pseudo_random_weights_list(min, max):    #create list of 1000 pseudo random values for neural network weights
-  
+class RestrictedBoltzmannMachine(nn.Module):
+    def __init__(self, visible_units, hidden_units):
+        super(RestrictedBoltzmannMachine, self).__init__()
+        self.weights = nn.Parameter(torch.randn(visible_units, hidden_units) * 0.01)
+        self.visible_bias = nn.Parameter(torch.zeros(visible_units))
+        self.hidden_bias = nn.Parameter(torch.zeros(hidden_units))
+    
+    def sample_hidden(self, visible_data):
+        hidden_probs = torch.sigmoid(torch.mm(visible_data, self.weights) + self.hidden_bias)
+        hidden_samples = torch.bernoulli(hidden_probs)
+        return hidden_probs, hidden_samples
+    
+    def sample_visible(self, hidden_data):
+        visible_probs = torch.sigmoid(torch.mm(hidden_data, self.weights.t()) + self.visible_bias)
+        visible_samples = torch.bernoulli(visible_probs)
+        return visible_probs, visible_samples
+    
+    def compute_free_energy(self, visible_units):
+        bias_term = torch.mm(visible_units, self.visible_bias.unsqueeze(1))
+        hidden_input = torch.mm(visible_units, self.weights) + self.hidden_bias
+        hidden_term = torch.sum(torch.log(1 + torch.exp(hidden_input)), dim=1)
+        return -bias_term.squeeze() - hidden_term
+    
+    def contrastive_divergence(self, input_data, k_steps=1):
+        initial_hidden_probs, initial_hidden_samples = self.sample_hidden(input_data)
+        
+        current_visible_probs, current_visible_samples = input_data, input_data
+        current_hidden_probs, current_hidden_samples = initial_hidden_probs, initial_hidden_samples
+        
+        for _ in range(k_steps):
+            current_hidden_probs, current_hidden_samples = self.sample_hidden(current_visible_probs)
+            current_visible_probs, current_visible_samples = self.sample_visible(current_hidden_probs)
+        
+        positive_gradient = torch.mm(input_data.t(), initial_hidden_probs)
+        negative_gradient = torch.mm(current_visible_probs.t(), current_hidden_probs)
+        
+        self.weights.data += 0.1 * (positive_gradient - negative_gradient)
+        self.visible_bias.data += 0.1 * (input_data - current_visible_probs).mean(0)
+        self.hidden_bias.data += 0.1 * (initial_hidden_probs - current_hidden_probs).mean(0)
+        
+        return torch.mean((input_data - current_visible_probs) ** 2)
 
-class neural_net(input, output):
-  self.input = input
-  self.output = output
+def train_rbm(rbm, training_data, num_epochs=100):
+    for epoch in range(num_epochs):
+        epoch_loss = 0
+        for batch in training_data:
+            batch_loss = rbm.contrastive_divergence(batch)
+            epoch_loss += batch_loss.item()
+        
+        if epoch % 10 == 0:
+            print(f'Epoch {epoch}, Loss: {epoch_loss / len(training_data)}')
 
-  mat = []
-  for o in range(len(output)):     
-    for i in range(len(input)):
-      
-
-  self.matrix 
+if __name__ == '__main__':
+    np.random.seed(42)
+    input_data = torch.bernoulli(torch.tensor(np.random.rand(100, 20), dtype=torch.float32))
+    
+    rbm = RestrictedBoltzmannMachine(visible_units=20, hidden_units=10)
+    train_rbm(rbm, input_data)
